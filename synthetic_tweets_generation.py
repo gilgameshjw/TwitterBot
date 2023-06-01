@@ -3,7 +3,7 @@ import random
 import json
 
 def generate_synthetic_tweets(num_tweets):
-    openai.api_key = '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'  # Replace with your OpenAI API key
+    openai.api_key = 'API_KEY'
     
     tweets = []
     
