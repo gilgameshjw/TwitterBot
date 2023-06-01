@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat History</title>
+    <style>
+        .input {
+            background-color: lightblue;
+        }
+
+        .output {
+            background-color: lightgreen;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat History</h1>
+    <div>
+        {% for entry in chat_history %}
+            <div class="entry">
+                <div class="input">
+                    <strong>User:</strong> {{ entry.input }}
+                </div>
+                <div class="output">
+                    <strong>ChatGPT:</strong> {{ entry.output }}
+                </div>
+                <div class="computation-time">
+                    <strong>Computation Time:</strong> {{ entry.computation_time }} seconds
+                </div>
+                <div class="price">
+                    <strong>Price:</strong> ${{ entry.price }}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    <form method="POST" action="/">
+        <label for="user_input">User Input:</label>
+        <input type="text" id="user_input" name="user_input">
+        <input type="submit" value="Send">
+    </form>
+</body>
+</html>
