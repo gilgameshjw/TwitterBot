@@ -1,0 +1,30 @@
+# configuration file for bot and twitter data extraction
+
+# bot configuration (training done with chatgpt)
+chatbot:
+  # supported option are:
+  # *exact: return exact historical match 
+  # *mimic_response: return response that mimics the historical match
+  search_mode: exact
+  similarity_threshold: 0.9
+
+# openai configuration
+openai: 
+  openai_key: <OPENAI_KEY>
+  openai_engine: davinci
+  fine_tune_job_id: <FINE_TUNE_JOB_ID>
+  # model in "production, example: davinci:ft...."
+  model_name: <MODEL_NAME>
+
+# twitter configuration
+# if twitter_api_key is None, the bot will use a mock random tweets generator
+twitter:
+  twitter_handle: realDonaldTrump
+  num_tweets: 500
+  consumer_key: <CONSUMER_KEY> 
+  consumer_secret: <CONSUMER_SECRET>
+  access_token: <ACCESS_TOKEN>
+  access_token_secret: <ACCESS_TOKEN_SECRET>
+  twitter_api_key: <TWITTER_API_KEY>
+  twitter_handle: realDonaldTrump
+  

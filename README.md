@@ -6,6 +6,11 @@ The bot can be trained generating synthetic data from well known twitter user (D
 or alternatively, real twitter data can be used.
 
 
+## Run 
+update config.yaml and run:
+
+`python api.py`
+
 
 ### Requirements
 One needs a openai key to generate the synthetic data and twitter secret token, access key and so on to download twitter data to built a twitterbot from it.
