@@ -2,6 +2,14 @@
 
 Automatised synthetic tweet generation from a real twitter handle.
 
+The bot can be trained generating synthetic data from well known twitter user (DonaldTrum, ...) 
+or alternatively, real twitter data can be used.
+
+
+
+### Requirements
+One needs a openai key to generate the synthetic data and twitter secret token, access key and so on to download twitter data to built a twitterbot from it.
+
 
 ### Configuration
 
