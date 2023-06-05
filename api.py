@@ -9,6 +9,7 @@ import tqdm
 from langchain.embeddings import HuggingFaceEmbeddings, SentenceTransformerEmbeddings 
 from flask import Flask, render_template, request
 import numpy as np
+import pickle as pkl
 
 
 app = Flask(__name__)
@@ -37,19 +38,32 @@ with open(data_file) as f:
 data = [json.loads(line[:-1]) for line in data]
 
 # massage historical data for retrieval
-dict_data = dict([(d["prompt"], d["completion"]) for d in data])
-prompts = list(set([d["prompt"] for d in data]))
-v_hist_data = [dict_data[p] for p in prompts]
-
-# create embeddings model
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-if not os.path.exists(vector_file+".npy"):
+# build model and embedding once if file not present
+if not os.path.exists(vector_file+".pkl"):
+
+    # massage historical data for retrieval
+    dict_data = dict([(d["prompt"], d["completion"]) for d in data])
+    prompts = list(set([d["prompt"] for d in data]))
+    v_hist_data = [dict_data[p] for p in prompts]
+    # embed prompts
     m_prompts = \
         np.array([embeddings.embed_query(p) for p in tqdm.tqdm(prompts)])
-    np.save(vector_file, m_prompts)
+    # write m_prompts into pickle file
+    data_embeddings = {"prompts": prompts, 
+                       "m_prompts": m_prompts, 
+                       "v_hist_data": v_hist_data, 
+                       "embeddings": embeddings, 
+                       "v_hist_data": v_hist_data}
+    with open(vector_file+".pkl", "wb") as f:
+        pkl.dump(data_embeddings, f)
 
-m_prompts = np.load(vector_file+".npy")
+data_embeddings = pkl.load(open(vector_file+".pkl", "rb"))
+
+prompts = data_embeddings["prompts"]
+m_prompts = data_embeddings["m_prompts"]
+v_hist_data = data_embeddings["v_hist_data"]
 
 
 ####################################################
@@ -79,13 +93,17 @@ def chat_with_gpt(user_input):
 
     # search in memory for similar prompts
     def search_in_memory(m_prompts, utterance):
-        v = np.array(embeddings.embed_query(utterance))
-        v_res = m_prompts.dot(v)
-        id, score = sorted(enumerate(v_res.tolist()), key=lambda x: x[1], reverse=True)[0]
+        v_utterance = np.array(embeddings.embed_query(utterance))
+        v_scores = m_prompts.dot(v_utterance)
+        id, score = sorted(enumerate(v_scores.tolist()), key=lambda x: x[1], reverse=True)[0]
         return id, score
-    
-    id, score = search_in_memory(m_prompts, user_input)
 
+
+    i = 0
+    user_input_tmp = prompts[i]
+    id, score = search_in_memory(m_prompts, user_input)
+    print("log:: retrieven id: ", id, "score: ", score)
+    
     if score > similarity_threshold:
         response_text = v_hist_data[id]
         
