@@ -58,7 +58,7 @@ Use a wellknown twitter handle in the config file and run:
 `bash script_generate_mock_tweets.sh`
 
 2. **Download Real Twitter Data**
-This workflow has never been tested and is expected to require adjustment:
+This workflow has never been tested and is expected to require slight adjustments:
 
 `bash script_download_and_preprocess_twitter_data.sh`
 

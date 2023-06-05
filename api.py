@@ -32,13 +32,13 @@ similarity_threshold = config["chatbot"]["similarity_threshold"]
 
 # run_mode = "light"
 if run_mode == "light":
-    print("--log:: run_mode is light, using openai_engine")
     openai_engine = openai_engine
+    print("--log:: run_mode is light, using openai_engine: ", openai_engine)
     similarity_threshold = 0.0
 
 else:
-    print("--log:: run_mode is full, using model_name")
     openai_engine = model_name
+    print("--log:: run_mode is full, using model_name: ", model_name)
 
 
 # check if numpy vector file exists
@@ -111,17 +111,25 @@ def chat_with_gpt(user_input):
         v_scores = m_prompts.dot(v_utterance)
         id, score = sorted(enumerate(v_scores.tolist()), key=lambda x: x[1], reverse=True)[0]
         return id, score
-
+    
     id, score = search_in_memory(m_prompts, user_input)
     print("--log:: retrieven id: ", id, "score: ", score)
+
+    # if agent is asked to generate a random tweet or "" is entered
+    train_prompt = f"generate a random tweet from {twitter_handle}"
+    if user_input == "" or user_input == train_prompt:
+        user_input == train_prompt
+        id = random.randint(0, len(v_hist_data))
 
     if score > similarity_threshold:
         response_text = v_hist_data[id]
         
-        if search_mode == "exact":
+        if search_mode == "exact" or run_mode == "light":
             return response_text, -1, -1
+        
         elif search_mode == "mimic_response":
-            user_input = "generate a tweet quite similar to the following one:\n" + response_text
+            if user_input != train_prompt:
+                user_input = "generate a tweet quite similar to the following one:\n" + response_text
 
     # Send user_input to ChatGPT and get the response
     start_time = time.time()

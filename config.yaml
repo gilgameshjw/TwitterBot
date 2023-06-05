@@ -7,7 +7,7 @@ chatbot:
   # run mode supported are: 
   # *light: doesn't use a fine tuned model and can be combined with mimic_response below
   # *normal: use a fine tuned model (openai::model_name))
-  run_mode: light
+  run_mode: normal
   # supported option are:
   # *exact: return exact historical match 
   # *mimic_response: return response that mimics the historical match
@@ -16,14 +16,14 @@ chatbot:
 
 # openai configuration
 openai: 
-  openai_key: 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
+  openai_key: <OPENAI_KEY>
   # engine for synthetic tweets generation
   openai_engine: text-davinci-003
   # engine to use for fine-tuning 
   openai_train_engine: davinci
-  fine_tune_job_id: ft-BxPdubzHlwVIEqwdhS9TAHT0
+  fine_tune_job_id: <FINE_TUNE_JOB_ID>
   # model in "prod"
-  model_name: "davinci:ft-jair-ltd-2023-06-05-15-54-53" 
+  model_name: <MODEL_NAME>
   #<MODEL_NAME>
 
 # twitter configuration
