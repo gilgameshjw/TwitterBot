@@ -11,15 +11,38 @@ update config.yaml and run:
 
 `python api.py`
 
+It will run on http://127.0.0.1:5000. Open that url and your browser.
+
+
+To generate **tweets**, enter generate a random tweet from {twitter_handle}, with twitter_handle that is for instance the realDonaldTrump or alternatively just send an empy string (keep prompt on webpage empty en click send).
+
+
+To generate **retweets**, enter random tweets the agent should be answering/retweeting to. 
+
 
 ### Requirements
 One needs a openai key to generate the synthetic data and twitter secret token, access key and so on to download twitter data to built a twitterbot from it.
 
 
 ### Configuration
-
 Meta data and parameters to run all functionalities of TwitterBot 
 ./config.yaml
+
+
+### Installation
+Use the standard requirements.txt file. 
+
+Alternatively, installing the libraries below should be enough:
+`
+pip install --upgrade openai
+pip install names
+pip install PyYAML
+pip install langchain
+pip install flask
+pip install sentence_transformers
+pip install tqdm
+pip install pickle5
+`
 
 
 ### Scripts

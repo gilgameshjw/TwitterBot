@@ -17,15 +17,16 @@ api_key = config['openai']['openai_key']
 openai.api_key = api_key
 
 # read the twitter handle from the command line
-if len(sys.argv) != 2:
-    print("Usage: python random_tweets.py <twitter_handle>")
+if len(sys.argv) != 3:
+    print("Usage: python random_tweets.py <character> <twitter_handle>")
     sys.exit(1)
-twitter_handle = sys.argv[1]
+character = " ".join(sys.argv[1].split("_"))
+twitter_handle = sys.argv[2]
 
 
 # Define a function for generating a tweet or retweet
 def generate_tweet():
-    prompt = f"Generate a{' retweet' if random.random() < 0.5 else ' tweet'} by {twitter_handle}:"
+    prompt = f"Can you generate a short {' retweet' if random.random() < 0.5 else ' tweet'} a character like {character} could have written?"
     response = openai.Completion.create(
         engine=engine,
         prompt=prompt,
@@ -37,7 +38,8 @@ def generate_tweet():
     return response.choices[0].text.strip()
 
 # run the random tweets generator
-with open('data/twitter_data_'+twitter_handle+'.jsonl', 'w') as file:
+with open('data/twitter_data_'+twitter_handle+'.jsonl', 'a') as file:
+    
     for _ in tqdm.tqdm(range(num_tweets)):
         if random.random() < 0.5:  # Generate a random tweet
             tweet = generate_tweet()

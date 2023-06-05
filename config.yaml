@@ -2,6 +2,12 @@
 
 # bot configuration (training done with chatgpt)
 chatbot:
+  # underscore necessary for code to work
+  character: donald_trump
+  # run mode supported are: 
+  # *light: doesn't use a fine tuned model and can be combined with mimic_response below
+  # *normal: use a fine tuned model (openai::model_name))
+  run_mode: light
   # supported option are:
   # *exact: return exact historical match 
   # *mimic_response: return response that mimics the historical match
@@ -10,17 +16,21 @@ chatbot:
 
 # openai configuration
 openai: 
-  openai_key: <OPENAI_KEY>
-  openai_engine: davinci
-  fine_tune_job_id: <FINE_TUNE_JOB_ID>
-  # model in "production, example: davinci:ft...."
-  model_name: <MODEL_NAME>
+  openai_key: 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
+  # engine for synthetic tweets generation
+  openai_engine: text-davinci-003
+  # engine to use for fine-tuning 
+  openai_train_engine: davinci
+  fine_tune_job_id: ft-BxPdubzHlwVIEqwdhS9TAHT0
+  # model in "prod"
+  model_name: "davinci:ft-jair-ltd-2023-06-05-15-54-53" 
+  #<MODEL_NAME>
 
 # twitter configuration
 # if twitter_api_key is None, the bot will use a mock random tweets generator
 twitter:
   twitter_handle: realDonaldTrump
-  num_tweets: 500
+  num_tweets: 400
   consumer_key: <CONSUMER_KEY> 
   consumer_secret: <CONSUMER_SECRET>
   access_token: <ACCESS_TOKEN>

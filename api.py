@@ -5,6 +5,7 @@ import json
 import yaml
 import os
 import tqdm 
+import random
 
 from langchain.embeddings import HuggingFaceEmbeddings, SentenceTransformerEmbeddings 
 from flask import Flask, render_template, request
@@ -20,12 +21,25 @@ with open("config.yaml") as f:
 
 api_key = config["openai"]["openai_key"]
 openai.api_key = api_key
+openai_engine = config["openai"]["openai_engine"]
 model_name = config["openai"]["model_name"]
 twitter_handle = config["twitter"]["twitter_handle"]
 
 # chatbot parameters
 search_mode = config["chatbot"]["search_mode"]
+run_mode = config["chatbot"]["run_mode"]
 similarity_threshold = config["chatbot"]["similarity_threshold"]
+
+# run_mode = "light"
+if run_mode == "light":
+    print("--log:: run_mode is light, using openai_engine")
+    openai_engine = openai_engine
+    similarity_threshold = 0.0
+
+else:
+    print("--log:: run_mode is full, using model_name")
+    openai_engine = model_name
+
 
 # check if numpy vector file exists
 # if not, create it
@@ -98,12 +112,9 @@ def chat_with_gpt(user_input):
         id, score = sorted(enumerate(v_scores.tolist()), key=lambda x: x[1], reverse=True)[0]
         return id, score
 
-
-    i = 0
-    user_input_tmp = prompts[i]
     id, score = search_in_memory(m_prompts, user_input)
-    print("log:: retrieven id: ", id, "score: ", score)
-    
+    print("--log:: retrieven id: ", id, "score: ", score)
+
     if score > similarity_threshold:
         response_text = v_hist_data[id]
         
@@ -115,7 +126,7 @@ def chat_with_gpt(user_input):
     # Send user_input to ChatGPT and get the response
     start_time = time.time()
     response = openai.Completion.create(
-        engine='text-davinci-003',
+        engine=openai_engine,
         prompt=user_input,
         max_tokens=50,
         temperature=0.7,
