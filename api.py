@@ -118,9 +118,9 @@ def chat_with_gpt(user_input):
     # if agent is asked to generate a random tweet or "" is entered
     train_prompt = f"generate a random tweet from {twitter_handle}"
     if user_input == "" or user_input == train_prompt:
-        user_input == train_prompt
+        user_input = train_prompt
         id = random.randint(0, len(v_hist_data))
-
+    
     if score > similarity_threshold:
         response_text = v_hist_data[id]
         
