@@ -13,6 +13,7 @@ config = yaml.load(open('config.yaml'), Loader=yaml.FullLoader)
 num_tweets = config['twitter']['num_tweets']
 engine = config['openai']['openai_engine']
 api_key = config['openai']['openai_key']
+persona = config['twitter']['twitter_handle']
 
 openai.api_key = api_key
 
@@ -45,8 +46,9 @@ def generate_command_virtual_conversation_data(twitter_data, persona, n_turns=10
     """
     command = f"Use the tweets below to build a virtual persona named {persona}:\n"
     command += f"1) simulate {n_turns} turns of a hypothetic conversation between rdp and a random user that never spoke together\n"
-    command += f"2) generate a list of python data dictionaries [{{\"prompt\": ... , \"completion\": ...}},...] for these {n_turns} turns\n" 
-    command += "3) return only a json dump of the above list.\n\n" 
+    command += f"2) the random user starts the conversation with a random realistic sentence\n"
+    command += f"3) generate a list of python data dictionaries [{{\"prompt\": ... , \"completion\": ...}},...] for these {n_turns} turns\n" 
+    command += "4) return only a json dump of the above list.\n\n" 
     
     for d in random.choices(twitter_data, k=n_turns):
         command += json.dumps(d) + "\n"
@@ -54,7 +56,7 @@ def generate_command_virtual_conversation_data(twitter_data, persona, n_turns=10
     return command
 
 
-def call_chat_gpt(command, max_tokens=2040, temperature=0.7, n=1, stop=None):
+def call_chat_gpt(command, max_tokens=2040, temperature=0.5, n=1, stop=None):
     """
     Call the OpenAI chatbot API
     args:
@@ -121,11 +123,11 @@ def generate_training_data(twitter_data, persona, n_turns, memory_length=10):
     """
     virtual_conversation_data = generate_virtual_conversation_data(twitter_data, persona, n_turns)
     training_data = None
-    persona = None
+    persona_data = None
     if not virtual_conversation_data is None:
         
         try:
-            persona = generate_persona(twitter_data, persona, 30)
+            persona_data = generate_persona(twitter_data, persona, 30)
         except:
             return None
 
@@ -135,10 +137,17 @@ def generate_training_data(twitter_data, persona, n_turns, memory_length=10):
             try:
 
                 print(i)
-                s = persona+"\n"
+                s = persona_data+"\n"
                 s+= "memory: \n\n"
-            
-                for vc in virtual_conversation_data[(i-memory_length):i]:
+
+                #print("###############################################")
+                #print("memory", memory_length)
+                #print(virtual_conversation_data)
+                #import sys
+                #sys.exit()
+                #print("###############################################")
+
+                for vc in virtual_conversation_data[max(0,i-memory_length):i]:
                 
                     s += "user: "+vc["prompt"]+"\n"
                     s += "agent: "+vc["completion"]+"\n"    
@@ -152,7 +161,7 @@ def generate_training_data(twitter_data, persona, n_turns, memory_length=10):
             except:
                 pass
 
-        return persona, training_data if persona is not None and training_data is not None \
+        return persona_data, training_data if persona_data is not None and training_data is not None \
               else None
 
 
@@ -174,36 +183,44 @@ if __name__ == '__main__':
         twitter_data = [json.loads(line[:-1]) for line in f.readlines()]
     
     persona_list = []
-    file_personas = open(f"data/persona_list_{twitter_handle}.jsonl", "w")
 
-
-    with open(f"data/train_twitter_data_{twitter_handle}.jsonl", "w") as file:
-
-        n_turns = 15
-        persona = character
-        train_data_list = []
+    n_turns = 15
+    persona = twitter_handle
+    train_data_list = []
         
-        percent = 0.
-
+    percent = 0.
+    persona_list = []
+    with open(f"data/train_twitter_data_{twitter_handle}.jsonl", "w") as file_training:
+        
         while len(train_data_list) < num_tweets:
             
             print("len train_data: ", len(train_data_list))
             data = generate_training_data(twitter_data, persona, n_turns)
             if data is not None:
-                persona, training_data = data
+                persona_data, training_data = data
+                #print("persona_data", persona_data)
             
                 # append personas
-                if persona is not None:
-                    persona_list.append(persona)
-                    file.write(persona+"\n") 
+                if persona_data is not None:
+                    persona_list.append(persona_data)
+                    #file_personas.write(persona_data+"\n") 
+                    print("persona_list",len(persona_list))
 
                 # write line by line
                 if training_data is not None:
                     for d in training_data:
-                        file.write(json.dumps(d) + "\n")
+                        file_training.write(json.dumps(d) + "\n")
 
                     train_data_list.extend(training_data)
             
                 if len(train_data_list) / num_tweets > percent + 0.1:
                     percent = len(train_data_list) / num_tweets + 0.1
-                    print("completion percent:",percent,"%")
+                    print("completion percent:",percent*100,"%")
+
+    # finally write persona into file
+    with open(f"data/persona_list_{twitter_handle}.jsonl", "w") as file_personas:
+        for p in persona_list:
+            file_personas.write(p+"\n")
+
+  
+

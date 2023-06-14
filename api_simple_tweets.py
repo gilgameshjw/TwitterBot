@@ -40,102 +40,6 @@ else:
     openai_engine = model_name
     print("--log:: run_mode is full, using model_name: ", model_name)
 
-######################################################
-######################################################
-file = "data/persona_list_realDonaldTrump.jsonl"
-
-with open(file) as f:
-    personas = [d for d in f.readlines() if not d=="\n"]
-
-
-# read twitter data
-file = "data/twitter_data_realDonaldTrump.jsonl"
-with open(file) as f:
-    twitter_data = [json.loads(line[:-1]) for line in f.readlines()]
-
-# write data line by line into files
-for i, d in enumerate(twitter_data):
-    with open(f"data_tweets/{i}.json", "w") as f:
-        f.write(json.dumps(d) + "\n")
-
-os.environ['OPENAI_API_KEY'] = "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"
-os.environ['ACTIVELOOP_TOKEN'] = "eyJhbGciOiJIUzUxMiIsImlhdCI6MTY4Njc3NTg3MCwiZXhwIjoxNjg2ODYyMjYzfQ.eyJpZCI6Ind1aWxsb3VkIn0.rnjGigMZZhS_oT22lLZhDoCpB7flhSqlOa8CSfBT8n-RLPG4_nvvZx-bxNS7bHPkE2nqF6jNarLCpTkvoRkHjA"
-# https://app.activeloop.ai/wuilloud/langchain-code
-
-root_dir = "/home/jair/WORK/TwitterBot/data_tweets/" #""datatest" #
-
-# build file list
-docs = []
-for dirpath, dirnames, filenames in os.walk(root_dir):
-    for file in filenames:
-        if file.endswith('.json'): # and '/.venv/' not in dirpath:
-            try: 
-                loader = TextLoader(os.path.join(dirpath, file), encoding='utf-8')
-                docs.extend(loader.load_and_split())
-            except Exception as e: 
-                pass
-print(f'{len(docs)}')
-
-from langchain.text_splitter import CharacterTextSplitter
-
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-texts = text_splitter.split_documents(docs)
-
-from langchain.embeddings.openai import OpenAIEmbeddings
-
-embeddings = OpenAIEmbeddings()
-from langchain.vectorstores import DeepLake
-
-
-DEEPLAKE_ACCOUNT_NAME = "wuilloud"
-db = DeepLake(dataset_path=f"hub://{DEEPLAKE_ACCOUNT_NAME}/langchain-code", read_only=True, embedding_function=embeddings)
-
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
-
-n_k = 10
-retriever = db.as_retriever()
-retriever.search_kwargs['distance_metric'] = 'cos'
-retriever.search_kwargs['fetch_k'] = n_k
-retriever.search_kwargs['maximal_marginal_relevance'] = True
-retriever.search_kwargs['k'] = n_k
-
-model = ChatOpenAI(model_name='gpt-3.5-turbo') # 'ada' 'gpt-3.5-turbo' 'gpt-4',
-qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
-
-
-def search_database(question, chat_history=[]):
-    
-    qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
-    result = qa({"question": question, "chat_history": chat_history})
-    return result["answer"]
-
-
-def hash_tag_analyser(txt):
-    
-    hash_tag_str = "summarise the meaning of the hashtag: "
-    hash_tags = [s for s in txt.split() if s[0] == "#" and len(s)>1]
-    
-    utterance = "\n"    
-    for hash_tag in hash_tags:
-        utterance += search_database(hash_tag_str + hash_tag) + "\n"
-    
-    return utterance
-
-def date_analyser(txt):
-    
-    analysis = "when and what was something very similar said: \n"+txt
-    return search_database(analysis) + "\n"
-
-def content_analyser(txt):
-    
-    analysis = "summarise what you find similar to: \n"+txt
-    return search_database(analysis) + "\n"
-
-
-#####################################################
-#####################################################
-
 
 # check if numpy vector file exists
 # if not, create it
@@ -181,7 +85,6 @@ v_hist_data = data_embeddings["v_hist_data"]
 ####################################################
 
 # chat history
-n_memory = 10
 chat_history = []
 
 @app.route('/', methods=['GET', 'POST'])
@@ -211,28 +114,28 @@ def chat_with_gpt(user_input):
     
     id, score = search_in_memory(m_prompts, user_input)
     print("--log:: retrieven id: ", id, "score: ", score)
-    
-    # take a random persona from list:
-    persona = random.choice(personas)
-    mssg = persona
-    # add history to mssg
-    for i in range(n_memory):
-        if len(chat_history) > i:
-            mssg += "\n" + chat_history[-i-1]["user"]
-            mssg += "\n" + chat_history[-i-1]["agent"]
-    # hash tag analyser
-    mssg += hash_tag_analyser(user_input)
-    # date analyser
-    mssg += date_analyser(user_input)
-    # content analyser
-    mssg += content_analyser(user_input)
 
- 
+    # if agent is asked to generate a random tweet or "" is entered
+    train_prompt = f"generate a random tweet from {twitter_handle}"
+    if user_input == "" or user_input == train_prompt:
+        user_input = train_prompt
+        id = random.randint(0, len(v_hist_data))
+    
+    if score > similarity_threshold:
+        response_text = v_hist_data[id]
+        
+        if search_mode == "exact" or run_mode == "light":
+            return response_text, -1, -1
+        
+        elif search_mode == "mimic_response":
+            if user_input != train_prompt:
+                user_input = "generate a tweet quite similar to the following one:\n" + response_text
+
     # Send user_input to ChatGPT and get the response
     start_time = time.time()
     response = openai.Completion.create(
         engine=openai_engine,
-        prompt=mssg,
+        prompt=user_input,
         max_tokens=50,
         temperature=0.7,
         n = 1,
@@ -242,9 +145,7 @@ def chat_with_gpt(user_input):
     computation_time = end_time - start_time
     price = computation_time * 0.000048  # Cost per second with text-davinci-003 engine
 
-
     response_text = response.choices[0].text.strip()
-    chat_history.append({"user": user_input, "agent": response_text})
     return response_text, computation_time, price
 
 if __name__ == '__main__':
