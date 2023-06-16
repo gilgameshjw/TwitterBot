@@ -40,6 +40,7 @@ else:
     openai_engine = model_name
     print("--log:: run_mode is full, using model_name: ", model_name)
 
+
 ######################################################
 ######################################################
 file = "data/persona_list_realDonaldTrump.jsonl"
@@ -49,20 +50,23 @@ with open(file) as f:
 
 
 # read twitter data
-file = "data/twitter_data_realDonaldTrump.jsonl"
+file = "data/train_twitter_data_realDonaldTrump.jsonl"
 with open(file) as f:
     twitter_data = [json.loads(line[:-1]) for line in f.readlines()]
 
 # write data line by line into files
 for i, d in enumerate(twitter_data):
-    with open(f"data_tweets/{i}.json", "w") as f:
+    with open(f"data_db/{i}.json", "w") as f:
         f.write(json.dumps(d) + "\n")
 
 os.environ['OPENAI_API_KEY'] = "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"
-os.environ['ACTIVELOOP_TOKEN'] = "eyJhbGciOiJIUzUxMiIsImlhdCI6MTY4Njc3NTg3MCwiZXhwIjoxNjg2ODYyMjYzfQ.eyJpZCI6Ind1aWxsb3VkIn0.rnjGigMZZhS_oT22lLZhDoCpB7flhSqlOa8CSfBT8n-RLPG4_nvvZx-bxNS7bHPkE2nqF6jNarLCpTkvoRkHjA"
+os.environ['ACTIVELOOP_TOKEN'] = "eyJhbGciOiJIUzUxMiIsImlhdCI6MTY4NjkzOTc1NSwiZXhwIjoxNjg3MDI2MTQ3fQ.eyJpZCI6Ind1aWxsb3VkIn0.4L38izwLMktUsCyCkt76QatptwWsDcM-XZp7_yI-BgjTAI07PAPe1bhmbqm987QQ0u0KYrZIkhqrSaCT03vRTg"
+# https://app.activeloop.ai/login
 # https://app.activeloop.ai/wuilloud/langchain-code
 
-root_dir = "/home/jair/WORK/TwitterBot/data_tweets/" #""datatest" #
+root_dir = "/home/jair/WORK/TwitterBot/data_db/" #""datatest" #
+
+print("###########")
 
 # build file list
 docs = []
@@ -105,9 +109,10 @@ qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
 
 
 def search_database(question, chat_history=[]):
-    
+    print("question search database:: ", question)
     qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
-    result = qa({"question": question, "chat_history": chat_history})
+    result = qa({"question": question, \
+                 "chat_history": chat_history})
     return result["answer"]
 
 
@@ -137,45 +142,6 @@ def content_analyser(txt):
 #####################################################
 
 
-# check if numpy vector file exists
-# if not, create it
-vector_file = "data/vectorised_prompts_"+twitter_handle #+".npy"
-data_file = "data/parsed_twitter_data_"+twitter_handle+"_prepared.jsonl"
-
-# load data
-with open(data_file) as f:
-    data = f.readlines()
-data = [json.loads(line[:-1]) for line in data]
-
-# massage historical data for retrieval
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-
-# build model and embedding once if file not present
-if not os.path.exists(vector_file+".pkl"):
-
-    # massage historical data for retrieval
-    dict_data = dict([(d["prompt"], d["completion"]) for d in data])
-    prompts = list(set([d["prompt"] for d in data]))
-    v_hist_data = [dict_data[p] for p in prompts]
-    # embed prompts
-    m_prompts = \
-        np.array([embeddings.embed_query(p) for p in tqdm.tqdm(prompts)])
-    # write m_prompts into pickle file
-    data_embeddings = {"prompts": prompts, 
-                       "m_prompts": m_prompts, 
-                       "v_hist_data": v_hist_data, 
-                       "embeddings": embeddings, 
-                       "v_hist_data": v_hist_data}
-    with open(vector_file+".pkl", "wb") as f:
-        pkl.dump(data_embeddings, f)
-
-data_embeddings = pkl.load(open(vector_file+".pkl", "rb"))
-
-prompts = data_embeddings["prompts"]
-m_prompts = data_embeddings["m_prompts"]
-v_hist_data = data_embeddings["v_hist_data"]
-
-
 ####################################################
 ##### APP        ###################################
 ####################################################
@@ -202,6 +168,7 @@ def home():
 
 def chat_with_gpt(user_input):
 
+    """
     # search in memory for similar prompts
     def search_in_memory(m_prompts, utterance):
         v_utterance = np.array(embeddings.embed_query(utterance))
@@ -212,6 +179,8 @@ def chat_with_gpt(user_input):
     id, score = search_in_memory(m_prompts, user_input)
     print("--log:: retrieven id: ", id, "score: ", score)
     
+    """
+
     # take a random persona from list:
     persona = random.choice(personas)
     mssg = persona
@@ -227,7 +196,6 @@ def chat_with_gpt(user_input):
     # content analyser
     mssg += content_analyser(user_input)
 
- 
     # Send user_input to ChatGPT and get the response
     start_time = time.time()
     response = openai.Completion.create(
@@ -242,10 +210,10 @@ def chat_with_gpt(user_input):
     computation_time = end_time - start_time
     price = computation_time * 0.000048  # Cost per second with text-davinci-003 engine
 
-
     response_text = response.choices[0].text.strip()
     chat_history.append({"user": user_input, "agent": response_text})
     return response_text, computation_time, price
+
 
 if __name__ == '__main__':
     app.run(debug=True)
