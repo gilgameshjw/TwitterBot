@@ -4,20 +4,14 @@ import time
 import json
 import yaml
 import os
-import tqdm 
 import random
 
-from langchain.embeddings import HuggingFaceEmbeddings, SentenceTransformerEmbeddings 
 from flask import Flask, render_template, request
-import numpy as np
-import pickle as pkl
 
-from langchain.vectorstores import DeepLake
 from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings, SentenceTransformerEmbeddings 
 
+import src.utils as utils
 
 app = Flask(__name__)
 
@@ -31,6 +25,8 @@ deeplake_key = config["deeplake"]["api_key"]
 deeplake_account_name = config["deeplake"]["account_name"]
 deeplake_local_path = config["deeplake"]["local_path"]
 deeplake_search_nk = config["deeplake"]["search_nk"]
+deeplake_search_model = config["deeplake"]["search_model"]
+
 openai_engine = config["openai"]["openai_engine"]
 model_name = config["openai"]["model_name"]
 twitter_handle = config["twitter"]["twitter_handle"]
@@ -71,86 +67,16 @@ os.environ['OPENAI_openai_key'] = openai_key
 os.environ['ACTIVELOOP_TOKEN'] = deeplake_key
 
 
-def build_deep_lake_db(root_dir=deeplake_local_path):
-
-    root_dir = deeplake_local_path #""datatest" #
-
-
-    # build file list
-    docs = []
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        for file in filenames:
-            if file.endswith('.json'): # and '/.venv/' not in dirpath:
-                try: 
-                    loader = TextLoader(os.path.join(dirpath, file), encoding='utf-8')
-                    docs.extend(loader.load_and_split())
-                except Exception as e: 
-                    pass
-    print(f'{len(docs)}')
-
-    # process docs
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-    texts = text_splitter.split_documents(docs)
-
-    # build embeddings
-    embeddings = OpenAIEmbeddings()
-    # build database 
-    db = DeepLake(dataset_path=f"hub://{deeplake_account_name}/langchain-code", read_only=True, embedding_function=embeddings)
-    return db
-
-def get_retriever(db, search_nk=deeplake_search_nk):
-    """Returns a retriever with the given search_nk"""
-    retriever = db.as_retriever()
-    retriever.search_kwargs['distance_metric'] = 'cos'
-    retriever.search_kwargs['fetch_k'] = search_nk
-    retriever.search_kwargs['maximal_marginal_relevance'] = True
-    retriever.search_kwargs['k'] = search_nk
-    return retriever
-
-def get_qa(deeplake_local_path):
-    """Returns a ConversationalRetrievalChain with the given retriever"""
-    model = ChatOpenAI(model_name='gpt-3.5-turbo') # 'ada' 'gpt-3.5-turbo' 'gpt-4',
-    db = build_deep_lake_db(deeplake_local_path)
-    retriever = get_retriever(db)
-    qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
-    return qa
-
-def search_database(question, chat_history=[]):
-    print("question search database:: ", question)
-    qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
-    result = qa({"question": question, \
-                 "chat_history": chat_history})
-    return result["answer"]
-
-
-def hash_tag_analyser(txt):
-    
-    hash_tag_str = "summarise the meaning of the hashtag: "
-    hash_tags = [s for s in txt.split() if s[0] == "#" and len(s)>1]
-    
-    utterance = "\n"    
-    for hash_tag in hash_tags:
-        utterance += search_database(hash_tag_str + hash_tag) + "\n"
-    
-    return utterance
-
-def date_analyser(txt):
-    
-    analysis = "when and what was something very similar said: \n"+txt
-    return search_database(analysis) + "\n"
-
-def content_analyser(txt):
-    
-    analysis = "summarise what you find similar to: \n"+txt
-    return search_database(analysis) + "\n"
 
 
 ####################################################
 ##### APP        ###################################
 ####################################################
 
+# search model
+search_model = ChatOpenAI(model_name=deeplake_search_model) # 'ada' 'gpt-3.5-turbo' 'gpt-4',
 # build qa
-qa = get_qa(deeplake_local_path)
+qa = get_qa(search_model, deeplake_local_path)
 
 # chat history
 n_memory = 10

@@ -40,9 +40,12 @@ twitter:
 
 # cloud memory configuration
 # https://app.activeloop.ai/login
+# https://app.activeloop.ai/wuilloud/langchain-code
 deeplake:
   account_name: <ACCOUNT_NAME>
   api_key: <API_KEY>
   local_path: data_db
   # setting nk too high lead to memory issues
   search_nk: 10
+  # search model: 'ada' 'gpt-3.5-turbo' 'gpt-4', ...
+  search_model: gpt-3.5-turbo
