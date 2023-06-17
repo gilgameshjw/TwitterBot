@@ -12,6 +12,12 @@ from flask import Flask, render_template, request
 import numpy as np
 import pickle as pkl
 
+from langchain.vectorstores import DeepLake
+from langchain.chat_models import ChatOpenAI
+from langchain.chains import ConversationalRetrievalChain
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings.openai import OpenAIEmbeddings
+
 
 app = Flask(__name__)
 
@@ -19,8 +25,12 @@ app = Flask(__name__)
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-api_key = config["openai"]["openai_key"]
-openai.api_key = api_key
+openai_key = config["openai"]["openai_key"]
+openai.api_key = openai_key
+deeplake_key = config["deeplake"]["api_key"]
+deeplake_account_name = config["deeplake"]["account_name"]
+deeplake_local_path = config["deeplake"]["local_path"]
+deeplake_search_nk = config["deeplake"]["search_nk"]
 openai_engine = config["openai"]["openai_engine"]
 model_name = config["openai"]["model_name"]
 twitter_handle = config["twitter"]["twitter_handle"]
@@ -41,16 +51,14 @@ else:
     print("--log:: run_mode is full, using model_name: ", model_name)
 
 
-######################################################
-######################################################
-file = "data/persona_list_realDonaldTrump.jsonl"
+file = f"data/persona_list_{twitter_handle}.jsonl"
 
 with open(file) as f:
     personas = [d for d in f.readlines() if not d=="\n"]
 
 
 # read twitter data
-file = "data/train_twitter_data_realDonaldTrump.jsonl"
+file = f"data/train_twitter_data_{twitter_handle}.jsonl"
 with open(file) as f:
     twitter_data = [json.loads(line[:-1]) for line in f.readlines()]
 
@@ -59,54 +67,53 @@ for i, d in enumerate(twitter_data):
     with open(f"data_db/{i}.json", "w") as f:
         f.write(json.dumps(d) + "\n")
 
-os.environ['OPENAI_API_KEY'] = "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"
-os.environ['ACTIVELOOP_TOKEN'] = "eyJhbGciOiJIUzUxMiIsImlhdCI6MTY4NjkzOTc1NSwiZXhwIjoxNjg3MDI2MTQ3fQ.eyJpZCI6Ind1aWxsb3VkIn0.4L38izwLMktUsCyCkt76QatptwWsDcM-XZp7_yI-BgjTAI07PAPe1bhmbqm987QQ0u0KYrZIkhqrSaCT03vRTg"
-# https://app.activeloop.ai/login
-# https://app.activeloop.ai/wuilloud/langchain-code
-
-root_dir = "/home/jair/WORK/TwitterBot/data_db/" #""datatest" #
-
-print("###########")
-
-# build file list
-docs = []
-for dirpath, dirnames, filenames in os.walk(root_dir):
-    for file in filenames:
-        if file.endswith('.json'): # and '/.venv/' not in dirpath:
-            try: 
-                loader = TextLoader(os.path.join(dirpath, file), encoding='utf-8')
-                docs.extend(loader.load_and_split())
-            except Exception as e: 
-                pass
-print(f'{len(docs)}')
-
-from langchain.text_splitter import CharacterTextSplitter
-
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-texts = text_splitter.split_documents(docs)
-
-from langchain.embeddings.openai import OpenAIEmbeddings
-
-embeddings = OpenAIEmbeddings()
-from langchain.vectorstores import DeepLake
+os.environ['OPENAI_openai_key'] = openai_key
+os.environ['ACTIVELOOP_TOKEN'] = deeplake_key
 
 
-DEEPLAKE_ACCOUNT_NAME = "wuilloud"
-db = DeepLake(dataset_path=f"hub://{DEEPLAKE_ACCOUNT_NAME}/langchain-code", read_only=True, embedding_function=embeddings)
+def build_deep_lake_db(root_dir=deeplake_local_path):
 
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
+    root_dir = deeplake_local_path #""datatest" #
 
-n_k = 10
-retriever = db.as_retriever()
-retriever.search_kwargs['distance_metric'] = 'cos'
-retriever.search_kwargs['fetch_k'] = n_k
-retriever.search_kwargs['maximal_marginal_relevance'] = True
-retriever.search_kwargs['k'] = n_k
 
-model = ChatOpenAI(model_name='gpt-3.5-turbo') # 'ada' 'gpt-3.5-turbo' 'gpt-4',
-qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
+    # build file list
+    docs = []
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        for file in filenames:
+            if file.endswith('.json'): # and '/.venv/' not in dirpath:
+                try: 
+                    loader = TextLoader(os.path.join(dirpath, file), encoding='utf-8')
+                    docs.extend(loader.load_and_split())
+                except Exception as e: 
+                    pass
+    print(f'{len(docs)}')
 
+    # process docs
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    texts = text_splitter.split_documents(docs)
+
+    # build embeddings
+    embeddings = OpenAIEmbeddings()
+    # build database 
+    db = DeepLake(dataset_path=f"hub://{deeplake_account_name}/langchain-code", read_only=True, embedding_function=embeddings)
+    return db
+
+def get_retriever(db, search_nk=deeplake_search_nk):
+    """Returns a retriever with the given search_nk"""
+    retriever = db.as_retriever()
+    retriever.search_kwargs['distance_metric'] = 'cos'
+    retriever.search_kwargs['fetch_k'] = search_nk
+    retriever.search_kwargs['maximal_marginal_relevance'] = True
+    retriever.search_kwargs['k'] = search_nk
+    return retriever
+
+def get_qa(deeplake_local_path):
+    """Returns a ConversationalRetrievalChain with the given retriever"""
+    model = ChatOpenAI(model_name='gpt-3.5-turbo') # 'ada' 'gpt-3.5-turbo' 'gpt-4',
+    db = build_deep_lake_db(deeplake_local_path)
+    retriever = get_retriever(db)
+    qa = ConversationalRetrievalChain.from_llm(model,retriever=retriever)
+    return qa
 
 def search_database(question, chat_history=[]):
     print("question search database:: ", question)
@@ -138,13 +145,12 @@ def content_analyser(txt):
     return search_database(analysis) + "\n"
 
 
-#####################################################
-#####################################################
-
-
 ####################################################
 ##### APP        ###################################
 ####################################################
+
+# build qa
+qa = get_qa(deeplake_local_path)
 
 # chat history
 n_memory = 10
