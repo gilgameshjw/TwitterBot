@@ -5,6 +5,11 @@ Automatised synthetic tweet generation from a real twitter handle.
 The bot can be trained generating synthetic data from well known twitter user (DonaldTrum, ...) 
 or alternatively, real twitter data can be used.
 
+**TwitterBot:** 
+* mymics the twitterer's style
+* is trained to run casual conversations
+* is capable of relating information found in older tweets and integrate this in its responses 
+
 
 ## Run 
 update config.yaml and run:
@@ -21,8 +26,9 @@ To generate **retweets**, enter random tweets the agent should be answering/retw
 
 
 ### Requirements
-One needs a openai key to generate the synthetic data and twitter secret token, access key and so on to download twitter data to built a twitterbot from it.
-
+One needs:
+*  **openai key** to generate the synthetic data and twitter secret token, access key and so on to download twitter data to built a twitterbot from it.
+* **deeplake key** as the cloud based technology to build the  agent memory as knowledge base built with the historical tweets.
 
 ### Configuration
 Meta data and parameters to run all functionalities of TwitterBot 
@@ -42,6 +48,7 @@ pip install flask
 pip install sentence_transformers
 pip install tqdm
 pip install pickle5
+pip install deeplake
 `
 
 
