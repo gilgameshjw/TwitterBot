@@ -63,10 +63,8 @@ for i, d in enumerate(twitter_data):
     with open(f"data_db/{i}.json", "w") as f:
         f.write(json.dumps(d) + "\n")
 
-os.environ['OPENAI_openai_key'] = openai_key
-os.environ['ACTIVELOOP_TOKEN'] = deeplake_key
-
-
+os.environ["OPENAI_API_KEY"] = openai_key
+os.environ["ACTIVELOOP_TOKEN"] = deeplake_key
 
 
 ####################################################
@@ -74,9 +72,10 @@ os.environ['ACTIVELOOP_TOKEN'] = deeplake_key
 ####################################################
 
 # search model
-search_model = ChatOpenAI(model_name=deeplake_search_model) # 'ada' 'gpt-3.5-turbo' 'gpt-4',
+search_model = ChatOpenAI(model_name=deeplake_search_model) 
 # build qa
-qa = get_qa(search_model, deeplake_local_path)
+print(deeplake_local_path)
+qa = utils.get_qa(search_model, deeplake_local_path, deeplake_account_name)
 
 # chat history
 n_memory = 10
@@ -112,7 +111,9 @@ def chat_with_gpt(user_input):
     print("--log:: retrieven id: ", id, "score: ", score)
     
     """
-
+    
+    qa = utils.get_qa(search_model, deeplake_local_path, deeplake_account_name)
+    
     # take a random persona from list:
     persona = random.choice(personas)
     mssg = persona
@@ -122,11 +123,11 @@ def chat_with_gpt(user_input):
             mssg += "\n" + chat_history[-i-1]["user"]
             mssg += "\n" + chat_history[-i-1]["agent"]
     # hash tag analyser
-    mssg += hash_tag_analyser(user_input)
+    mssg += utils.hash_tag_analyser(search_model, qa, user_input)
     # date analyser
-    mssg += date_analyser(user_input)
+    mssg += utils.date_analyser(search_model, qa, user_input)
     # content analyser
-    mssg += content_analyser(user_input)
+    mssg += utils.content_analyser(search_model, qa, user_input)
 
     # Send user_input to ChatGPT and get the response
     start_time = time.time()
@@ -144,6 +145,7 @@ def chat_with_gpt(user_input):
 
     response_text = response.choices[0].text.strip()
     chat_history.append({"user": user_input, "agent": response_text})
+    print(chat_history)
     return response_text, computation_time, price
 
 
