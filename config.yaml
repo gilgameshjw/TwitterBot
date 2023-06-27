@@ -12,19 +12,19 @@ chatbot:
   # *exact: return exact historical match 
   # *mimic_response: return response that mimics the historical match
   search_mode: exact
-  similarity_threshold: 0.9
+  similarity_threshold: 0.7
 
 # openai configuration
 openai: 
-  openai_key: <OPENAI_KEY> 
+  openai_key: <OPENAI_KEY>
   # engine for synthetic tweets generation
   openai_engine: text-davinci-003
   # engine to use for fine-tuning 
   openai_train_engine: davinci
-  # change fine tune job id when running own models
-  fine_tune_job_id: ft-DPzMF6vRZ7yS0ToqJYpWEW5f
-  # change model name when running own models
-  model_name: davinci:ft-jair-ltd-2023-06-14-17-47-18
+  fine_tune_job_id: <FINE_TUNE_JOB_ID>
+  temperature: 0.1
+  # model in "prod"
+  model_name: <MODEL_NAME>
 
 # twitter configuration
 # if twitter_api_key is None, the bot will use a mock random tweets generator
@@ -41,11 +41,7 @@ twitter:
 # cloud memory configuration
 # https://app.activeloop.ai/login
 # https://app.activeloop.ai/wuilloud/langchain-code
-deeplake:
-  account_name: <ACCOUNT_NAME>
-  api_key: <API_KEY>
-  local_path: data_db
-  # setting nk too high lead to memory issues
-  search_nk: 10
-  # search model: 'ada' 'gpt-3.5-turbo' 'gpt-4', ...
-  search_model: gpt-3.5-turbo
+store_index:
+  local_data_path: data_db
+  # hardcoded in llama_index
+  local_db: storage

@@ -21,14 +21,14 @@ with open("config.yaml") as f:
 
 openai_key = config["openai"]["openai_key"]
 openai.api_key = openai_key
-deeplake_key = config["deeplake"]["api_key"]
-deeplake_account_name = config["deeplake"]["account_name"]
-deeplake_local_path = config["deeplake"]["local_path"]
-deeplake_search_nk = config["deeplake"]["search_nk"]
-deeplake_search_model = config["deeplake"]["search_model"]
+
+# read config.yaml file
+local_data_path = config["store_index"]["local_data_path"]
+local_db = config["store_index"]["local_db"]
 
 openai_engine = config["openai"]["openai_engine"]
 model_name = config["openai"]["model_name"]
+temperature = config["openai"]["temperature"]
 twitter_handle = config["twitter"]["twitter_handle"]
 
 # chatbot parameters
@@ -54,31 +54,41 @@ with open(file) as f:
 
 
 # read twitter data
-file = f"data/train_twitter_data_{twitter_handle}.jsonl"
+file = f"data/twitter_data_{twitter_handle}.jsonl"
 with open(file) as f:
     twitter_data = [json.loads(line[:-1]) for line in f.readlines()]
 
 # write data line by line into files
 for i, d in enumerate(twitter_data):
+    
+    if "retweeted_status" in d:
+        d = {"tweet": d["retweeted_status"]["text"], 
+             "retweet": d["text"]}
+    else:
+        d = {"tweet": d["text"]}
+    
     with open(f"data_db/{i}.json", "w") as f:
         f.write(json.dumps(d) + "\n")
 
 os.environ["OPENAI_API_KEY"] = openai_key
-os.environ["ACTIVELOOP_TOKEN"] = deeplake_key
+
+
 
 
 ####################################################
 ##### APP        ###################################
 ####################################################
 
-# search model
-search_model = ChatOpenAI(model_name=deeplake_search_model) 
-# build qa
-print(deeplake_local_path)
-qa = utils.get_qa(search_model, deeplake_local_path, deeplake_account_name)
+# load or build db
+query_engine = None
+if not os.path.isdir(local_db):
+    query_engine = utils.build_db(local_data_path, local_db)
+else:
+    query_engine = utils.load_db(local_db)
 
 # chat history
 n_memory = 10
+chat_flow = []
 chat_history = []
 
 @app.route('/', methods=['GET', 'POST'])
@@ -98,44 +108,45 @@ def home():
 
 
 def chat_with_gpt(user_input):
+    """Chat with GPT-3 and return the response"""
 
-    """
-    # search in memory for similar prompts
-    def search_in_memory(m_prompts, utterance):
-        v_utterance = np.array(embeddings.embed_query(utterance))
-        v_scores = m_prompts.dot(v_utterance)
-        id, score = sorted(enumerate(v_scores.tolist()), key=lambda x: x[1], reverse=True)[0]
-        return id, score
+    score, retweet = utils.search_utterance_in_db(query_engine, user_input)
     
-    id, score = search_in_memory(m_prompts, user_input)
-    print("--log:: retrieven id: ", id, "score: ", score)
-    
-    """
-    
-    qa = utils.get_qa(search_model, deeplake_local_path, deeplake_account_name)
     
     # take a random persona from list:
     persona = random.choice(personas)
     mssg = persona
-    # add history to mssg
-    for i in range(n_memory):
-        if len(chat_history) > i:
-            mssg += "\n" + chat_history[-i-1]["user"]
-            mssg += "\n" + chat_history[-i-1]["agent"]
-    # hash tag analyser
-    mssg += utils.hash_tag_analyser(search_model, qa, user_input)
-    # date analyser
-    mssg += utils.date_analyser(search_model, qa, user_input)
-    # content analyser
-    mssg += utils.content_analyser(search_model, qa, user_input)
 
+    mssg = "You are: " + persona
+    mssg += f"\nYou are {twitter_handle} and you chat with user."
+    mssg += "\nmake your answer short if you can!\n \n \n"
+
+
+    #if score >= similarity_threshold:
+    #    #response_text = retweet
+    #    mssg += f"\n\n Forget about your training and memory and say something very similar to the following sentence:"
+    #    mssg += f"\n{retweet}\n"
+    #else:
+
+    mssg += "\nchat history:\n"
+    for i in range(n_memory):
+        if len(chat_flow) > i:
+            mssg += "\nuser: " + chat_flow[i]["user"]
+            mssg += f"\n{twitter_handle}: " + chat_flow[i]["agent"]
+        else:
+            break
+
+    mssg += f"\nuser: {user_input}\n"
+
+    print("--log: mssg:::::", mssg)
+    
     # Send user_input to ChatGPT and get the response
     start_time = time.time()
     response = openai.Completion.create(
-        engine=openai_engine,
+        engine=model_name,
         prompt=mssg,
-        max_tokens=50,
-        temperature=0.7,
+        max_tokens=150,
+        temperature=temperature,
         n = 1,
         stop=None,
     )
@@ -143,9 +154,19 @@ def chat_with_gpt(user_input):
     computation_time = end_time - start_time
     price = computation_time * 0.000048  # Cost per second with text-davinci-003 engine
 
+    
+    print("--log: response:::::", response)
     response_text = response.choices[0].text.strip()
-    chat_history.append({"user": user_input, "agent": response_text})
-    print(chat_history)
+    # massage because of some issues with training...
+    response_text = response_text.split("\n")[0]
+    response_text = response_text.split("user:")[0]
+    response_text = response_text.replace(twitter_handle+":", "")
+    
+    # overwrite if twitterer had a retweet to something similar to the user input
+    if score >= similarity_threshold:
+        response_text = retweet
+        
+    chat_flow.append({"user": user_input, "agent": response_text})
     return response_text, computation_time, price
 
 
